@@ -42,10 +42,16 @@ The debug APK is generated at:
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
+For convenient download, the current test build is also tracked at:
+
+```text
+releases/Jarvis-v0.1.0-debug.apk
+```
+
 Install it on a connected device:
 
 ```bash
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r releases/Jarvis-v0.1.0-debug.apk
 ```
 
 ## Project structure
