@@ -46,6 +46,7 @@ data class AssessmentReport(
     val generatedAt: Instant,
     val risk: RiskLevel,
     val confidence: String,
+    val engineMode: String,
     val summary: String,
     val findings: List<Finding>,
     val remediations: List<Remediation>,

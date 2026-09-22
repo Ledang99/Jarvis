@@ -40,6 +40,7 @@ class DemoAssessmentEngine(
             generatedAt = Instant.now(clock),
             risk = risk,
             confidence = "Preliminary",
+            engineMode = "Local fallback",
             summary = summaryFor(input, risk),
             findings = findings,
             remediations = remediations,

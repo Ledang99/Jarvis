@@ -23,19 +23,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material.icons.rounded.Science
 import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -43,6 +39,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -75,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ledang99.jarvis.data.BackendAssessmentClient
 import com.ledang99.jarvis.data.DemoAssessmentEngine
 import com.ledang99.jarvis.domain.AssessmentReport
 import com.ledang99.jarvis.domain.CaseInput
@@ -118,10 +116,13 @@ private fun JarvisApp() {
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    val engine = remember { DemoAssessmentEngine() }
+    val localEngine = remember { DemoAssessmentEngine() }
+    val backendClient = remember {
+        BackendAssessmentClient(BuildConfig.JARVIS_API_BASE_URL)
+    }
     var screen by remember { mutableStateOf(AppScreen.HOME) }
-    var selectedType by remember { mutableStateOf(CaseType.INCIDENT) }
     var report by remember { mutableStateOf<AssessmentReport?>(null) }
+    var isAnalyzing by remember { mutableStateOf(false) }
 
     val pdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf"),
@@ -157,18 +158,32 @@ private fun JarvisApp() {
         ) {
             when (screen) {
                 AppScreen.HOME -> HomeScreen(
-                    onStart = { type ->
-                        selectedType = type
+                    onStart = {
                         screen = AppScreen.NEW_CASE
                     },
                 )
 
                 AppScreen.NEW_CASE -> NewCaseScreen(
-                    initialType = selectedType,
+                    initialType = CaseType.INCIDENT,
+                    isAnalyzing = isAnalyzing,
                     onBack = { screen = AppScreen.HOME },
                     onAnalyze = { input ->
-                        report = engine.analyze(input)
-                        screen = AppScreen.REPORT
+                        isAnalyzing = true
+                        scope.launch {
+                            val backendResult = backendClient.assess(input)
+                            report = backendResult.getOrElse {
+                                localEngine.analyze(input)
+                            }
+                            isAnalyzing = false
+                            screen = AppScreen.REPORT
+                            if (backendResult.isFailure) {
+                                launch {
+                                    snackbar.showSnackbar(
+                                        "Backend unavailable — used local fallback",
+                                    )
+                                }
+                            }
+                        }
                     },
                 )
 
@@ -196,7 +211,7 @@ private fun JarvisApp() {
 }
 
 @Composable
-private fun HomeScreen(onStart: (CaseType) -> Unit) {
+private fun HomeScreen(onStart: () -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 24.dp),
@@ -239,7 +254,7 @@ private fun HomeScreen(onStart: (CaseType) -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 AssistChip(
                     onClick = {},
-                    label = { Text("LOCAL DEMO MODE") },
+                    label = { Text("BACKEND + OFFLINE FALLBACK") },
                     leadingIcon = {
                         Icon(
                             Icons.Rounded.Science,
@@ -266,7 +281,7 @@ private fun HomeScreen(onStart: (CaseType) -> Unit) {
 
         item {
             Button(
-                onClick = { onStart(CaseType.INCIDENT) },
+                onClick = onStart,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
@@ -279,71 +294,7 @@ private fun HomeScreen(onStart: (CaseType) -> Unit) {
         }
 
         item {
-            Text(
-                "QUICK START",
-                style = MaterialTheme.typography.labelLarge,
-                color = Slate400,
-                letterSpacing = 1.4.sp,
-            )
-        }
-
-        items(CaseType.entries) { type ->
-            CaseTypeCard(type = type, onClick = { onStart(type) })
-        }
-
-        item {
             SafetyCard()
-        }
-    }
-}
-
-@Composable
-private fun CaseTypeCard(type: CaseType, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Navy900),
-        border = CardDefaults.outlinedCardBorder(),
-    ) {
-        Row(
-            modifier = Modifier.padding(18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(Navy800),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = when (type) {
-                        CaseType.VULNERABILITY -> Icons.Rounded.Security
-                        CaseType.INCIDENT -> Icons.Rounded.WarningAmber
-                        CaseType.PHISHING -> Icons.Rounded.Lock
-                        CaseType.HARDENING -> Icons.Rounded.VerifiedUser
-                    },
-                    contentDescription = null,
-                    tint = Teal300,
-                )
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(type.label, style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(3.dp))
-                Text(
-                    type.prompt,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Slate400,
-                )
-            }
-            Icon(
-                Icons.Rounded.ChevronRight,
-                contentDescription = null,
-                tint = Slate400,
-            )
         }
     }
 }
@@ -352,6 +303,7 @@ private fun CaseTypeCard(type: CaseType, onClick: () -> Unit) {
 @Composable
 private fun NewCaseScreen(
     initialType: CaseType,
+    isAnalyzing: Boolean,
     onBack: () -> Unit,
     onAnalyze: (CaseInput) -> Unit,
 ) {
@@ -367,7 +319,7 @@ private fun NewCaseScreen(
             TopAppBar(
                 title = { Text("New assessment") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = onBack, enabled = !isAnalyzing) {
                         Icon(
                             Icons.AutoMirrored.Rounded.ArrowBack,
                             contentDescription = "Back",
@@ -389,16 +341,24 @@ private fun NewCaseScreen(
                         ),
                     )
                 },
-                enabled = ready,
+                enabled = ready && !isAnalyzing,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 20.dp, vertical = 16.dp)
                     .height(54.dp),
                 shape = RoundedCornerShape(14.dp),
             ) {
-                Icon(Icons.Rounded.Security, contentDescription = null)
+                if (isAnalyzing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        strokeWidth = 2.dp,
+                        color = Navy950,
+                    )
+                } else {
+                    Icon(Icons.Rounded.Security, contentDescription = null)
+                }
                 Spacer(Modifier.width(8.dp))
-                Text("Generate assessment")
+                Text(if (isAnalyzing) "Running assessment…" else "Generate assessment")
             }
         },
     ) { padding ->
@@ -434,6 +394,7 @@ private fun NewCaseScreen(
                             FilterChip(
                                 selected = selectedType == type,
                                 onClick = { selectedType = type },
+                                enabled = !isAnalyzing,
                                 label = { Text(type.label) },
                             )
                         }
@@ -445,6 +406,7 @@ private fun NewCaseScreen(
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
+                    enabled = !isAnalyzing,
                     label = { Text("Case title") },
                     placeholder = { Text("Example: Suspicious sign-in alerts") },
                     singleLine = true,
@@ -457,6 +419,7 @@ private fun NewCaseScreen(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
+                    enabled = !isAnalyzing,
                     label = { Text("What happened?") },
                     placeholder = {
                         Text("Include observed behavior, dates, affected assets, and actions already taken.")
@@ -471,6 +434,7 @@ private fun NewCaseScreen(
                 OutlinedTextField(
                     value = environment,
                     onValueChange = { environment = it },
+                    enabled = !isAnalyzing,
                     label = { Text("Environment (optional)") },
                     placeholder = { Text("Example: Android fleet, Microsoft 365") },
                     modifier = Modifier.fillMaxWidth(),
@@ -493,7 +457,7 @@ private fun NewCaseScreen(
                             tint = Blue400,
                         )
                         Text(
-                            "This first APK uses a transparent local rules engine. Live, cited research will be connected through the secure backend in the next phase.",
+                            "Jarvis sends the case to the backend assessment workflow. If it cannot connect, the transparent local engine keeps the assessment available offline.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Slate300,
                         )
@@ -745,7 +709,7 @@ private fun RiskOverview(report: AssessmentReport) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                StatusItem("Mode", "Local demo")
+                StatusItem("Mode", report.engineMode.substringBefore(" "))
                 StatusItem("Confidence", report.confidence)
                 StatusItem("Type", report.case.type.label)
             }

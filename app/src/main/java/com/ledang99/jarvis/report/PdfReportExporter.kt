@@ -58,6 +58,7 @@ object PdfReportExporter {
             keyValue("Assessment type", report.case.type.label)
             keyValue("Preliminary risk", report.risk.label)
             keyValue("Confidence", report.confidence)
+            keyValue("Engine", report.engineMode)
             keyValue(
                 "Generated",
                 DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm z")

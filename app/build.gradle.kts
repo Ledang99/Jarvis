@@ -3,6 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val jarvisApiBaseUrl = providers.gradleProperty("jarvisApiBaseUrl")
+    .orElse("http://10.0.2.2:8787")
+
 android {
     namespace = "com.ledang99.jarvis"
     compileSdk = 37
@@ -15,6 +18,11 @@ android {
         versionName = "0.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "JARVIS_API_BASE_URL",
+            "\"${jarvisApiBaseUrl.get()}\"",
+        )
     }
 
     buildTypes {
@@ -49,6 +57,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -7,7 +7,8 @@ remediation checklist, reference starting points, and an exportable PDF report.
 ## MVP capabilities
 
 - Guided intake for incidents, vulnerabilities, phishing, and hardening
-- Transparent local demo analysis that works without credentials
+- FastAPI backend with an explicit assessment workflow
+- Transparent local fallback that works without a backend connection
 - Risk classification, findings, and ordered remediation steps
 - Validation guidance for every remediation
 - Official reference starting points from NIST, CISA, and CIS
@@ -15,9 +16,9 @@ remediation checklist, reference starting points, and an exportable PDF report.
 - PDF export through Android's secure document picker
 - Explicit limitations and human-approval boundaries
 
-The current local engine does **not** browse the web, inspect devices, scan
-networks, or execute remediation. It is an honest offline fallback while the
-cited research backend is developed.
+The current backend structures and triages the supplied information. It does
+**not** browse the web, inspect devices, scan networks, or execute remediation.
+It preserves an auditable boundary for the cited research provider added next.
 
 ## Technology
 
@@ -26,6 +27,29 @@ cited research backend is developed.
 - Android Gradle Plugin 9.4
 - Minimum Android version: Android 8.0 (API 26)
 - Target Android version: API 37
+- Python 3.12, FastAPI, and Pydantic
+
+## Run the backend
+
+```bash
+python3 -m venv backend/.venv
+backend/.venv/bin/pip install -r backend/requirements-dev.txt
+PYTHONPATH=backend backend/.venv/bin/python -m uvicorn \
+  jarvis_backend.main:app --host 0.0.0.0 --port 8787
+```
+
+The Android emulator uses `http://10.0.2.2:8787` by default. For a deployed
+HTTPS API, override the URL at build time:
+
+```bash
+./gradlew assembleDebug -PjarvisApiBaseUrl=https://api.example.com
+```
+
+Run backend tests:
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/pytest backend/tests
+```
 
 ## Build
 
@@ -59,10 +83,17 @@ adb install -r releases/Jarvis-v0.1.0-debug.apk
 ```text
 app/src/main/java/com/ledang99/jarvis/
 ├── MainActivity.kt              # Compose application and MVP screens
+├── data/BackendAssessmentClient.kt
 ├── data/DemoAssessmentEngine.kt # Transparent local assessment logic
 ├── domain/Assessment.kt         # Case and report models
 ├── report/PdfReportExporter.kt  # On-device PDF generation
 └── ui/theme/Theme.kt            # Jarvis visual system
+
+backend/
+├── jarvis_backend/main.py        # FastAPI routes
+├── jarvis_backend/engine.py      # Auditable assessment workflow
+├── jarvis_backend/models.py      # Validated API contract
+└── tests/test_engine.py
 ```
 
 ## Next phase
