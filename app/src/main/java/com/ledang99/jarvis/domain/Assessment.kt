@@ -39,6 +39,9 @@ data class Reference(
     val publisher: String,
     val title: String,
     val url: String,
+    val verificationStatus: String = "not_checked",
+    val retrievedAt: Instant? = null,
+    val evidence: String = "",
 )
 
 data class AssessmentReport(

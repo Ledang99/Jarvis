@@ -8,6 +8,8 @@ remediation checklist, reference starting points, and an exportable PDF report.
 
 - Guided intake for incidents, vulnerabilities, phishing, and hardening
 - FastAPI backend with an explicit assessment workflow
+- Live HTTPS verification of allowlisted NIST, NVD, CISA, and CIS sources
+- NVD and CISA KEV enrichment when a CVE is supplied
 - Transparent local fallback that works without a backend connection
 - Risk classification, findings, and ordered remediation steps
 - Validation guidance for every remediation
@@ -16,9 +18,10 @@ remediation checklist, reference starting points, and an exportable PDF report.
 - PDF export through Android's secure document picker
 - Explicit limitations and human-approval boundaries
 
-The current backend structures and triages the supplied information. It does
-**not** browse the web, inspect devices, scan networks, or execute remediation.
-It preserves an auditable boundary for the cited research provider added next.
+The backend queries only approved authoritative sources. It validates every
+redirect against the same HTTPS domain allowlist, records retrieval time and
+availability, and never treats a user-supplied URL as trusted. It does **not**
+inspect devices, scan networks, or execute remediation.
 
 ## Technology
 
@@ -37,6 +40,9 @@ backend/.venv/bin/pip install -r backend/requirements-dev.txt
 PYTHONPATH=backend backend/.venv/bin/python -m uvicorn \
   jarvis_backend.main:app --host 0.0.0.0 --port 8787
 ```
+
+NVD works without credentials at its public rate limit. Set `NVD_API_KEY` on the
+backend for higher limits; never place that key in the Android application.
 
 The Android emulator uses `http://10.0.2.2:8787` by default. For a deployed
 HTTPS API, override the URL at build time:
@@ -69,13 +75,13 @@ app/build/outputs/apk/debug/app-debug.apk
 For convenient download, the current test build is also tracked at:
 
 ```text
-releases/Jarvis-v0.2.0-debug.apk
+releases/Jarvis-v0.3.0-debug.apk
 ```
 
 Install it on a connected device:
 
 ```bash
-adb install -r releases/Jarvis-v0.2.0-debug.apk
+adb install -r releases/Jarvis-v0.3.0-debug.apk
 ```
 
 ## Project structure
@@ -93,19 +99,15 @@ backend/
 ├── jarvis_backend/main.py        # FastAPI routes
 ├── jarvis_backend/engine.py      # Auditable assessment workflow
 ├── jarvis_backend/models.py      # Validated API contract
+├── jarvis_backend/research.py    # Allowlisted live source verification
 └── tests/test_engine.py
 ```
 
 ## Next phase
 
-The live research backend should use an explicit, auditable workflow:
-
-1. Validate scope and authorization.
-2. Search an allowlist of authoritative sources.
-3. Extract evidence with source dates and citations.
-4. Detect conflicting or stale claims.
-5. Draft findings and remediation.
-6. Require user review before report generation.
+The next research stage will add citation-grounded model synthesis, conflict and
+staleness detection, and broader authoritative advisories while preserving the
+current allowlist, provenance, and human-review controls.
 
 Automatic scanning and remediation should remain out of scope until strong
 authorization, approval, audit, and rollback controls are in place.

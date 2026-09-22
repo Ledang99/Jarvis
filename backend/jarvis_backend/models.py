@@ -18,6 +18,12 @@ class RiskLevel(StrEnum):
     CRITICAL = "critical"
 
 
+class VerificationStatus(StrEnum):
+    VERIFIED = "verified"
+    UNAVAILABLE = "unavailable"
+    NOT_CHECKED = "not_checked"
+
+
 class CaseRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
@@ -50,6 +56,10 @@ class Reference(BaseModel):
     publisher: str
     title: str
     url: str
+    verification_status: VerificationStatus = VerificationStatus.NOT_CHECKED
+    retrieved_at: datetime | None = None
+    published_at: datetime | None = None
+    evidence: str | None = None
 
 
 class WorkflowStage(BaseModel):

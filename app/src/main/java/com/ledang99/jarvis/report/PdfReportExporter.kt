@@ -93,10 +93,22 @@ object PdfReportExporter {
                 cursorY += 8f
             }
 
-            section("Reference starting points")
+            section("External references")
             report.references.forEach { reference ->
-                ensureSpace(52f)
+                ensureSpace(82f)
                 drawWrapped("${reference.publisher} — ${reference.title}", headingPaint, 19f)
+                val verification = reference.verificationStatus
+                    .replace('_', ' ')
+                    .replaceFirstChar(Char::uppercase)
+                val retrieved = reference.retrievedAt?.let {
+                    DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm z")
+                        .withZone(ZoneId.systemDefault())
+                        .format(it)
+                } ?: "Not retrieved"
+                drawWrapped("$verification · $retrieved", labelPaint, 14f)
+                if (reference.evidence.isNotBlank()) {
+                    drawWrapped(reference.evidence, bodyPaint, 15f)
+                }
                 drawWrapped(reference.url, labelPaint, 14f)
                 cursorY += 5f
             }

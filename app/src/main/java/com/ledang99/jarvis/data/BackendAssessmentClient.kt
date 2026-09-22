@@ -23,8 +23,8 @@ class BackendAssessmentClient(
         runCatching {
             val connection = (URL(assessmentUrl).openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
-                connectTimeout = 3_000
-                readTimeout = 12_000
+                connectTimeout = 4_000
+                readTimeout = 25_000
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("Accept", "application/json")
@@ -100,6 +100,14 @@ class BackendAssessmentClient(
                         publisher = reference.getString("publisher"),
                         title = reference.getString("title"),
                         url = reference.getString("url"),
+                        verificationStatus = reference.optString(
+                            "verification_status",
+                            "not_checked",
+                        ),
+                        retrievedAt = reference.optString("retrieved_at")
+                            .takeIf(String::isNotBlank)
+                            ?.let { value -> runCatching { Instant.parse(value) }.getOrNull() },
+                        evidence = reference.optString("evidence"),
                     )
                 }
             },

@@ -12,6 +12,7 @@ from .models import (
     RiskLevel,
     WorkflowStage,
 )
+from .research import AuthoritativeResearchService
 
 
 class AssessmentEngine:
@@ -379,3 +380,101 @@ class AssessmentEngine:
             ),
         }
         return [specialized[case_type], common]
+
+
+class LiveAssessmentEngine:
+    """Adds allowlisted internet research to the deterministic policy engine."""
+
+    version = "live-research-v1"
+
+    def __init__(
+        self,
+        policy_engine: AssessmentEngine | None = None,
+        research_service: AuthoritativeResearchService | None = None,
+    ) -> None:
+        self._policy = policy_engine or AssessmentEngine()
+        self._research = research_service or AuthoritativeResearchService()
+
+    async def assess(self, case: CaseRequest) -> AssessmentResponse:
+        baseline = self._policy.assess(case)
+        research = await self._research.research(case, baseline.references)
+        risk = self._risk_max(baseline.risk, research.risk_floor)
+        verified = research.verified_count > 0
+
+        return baseline.model_copy(
+            update={
+                "risk": risk,
+                "confidence": (
+                    "Source-verified preliminary" if verified else "Preliminary"
+                ),
+                "findings": [*research.findings, *baseline.findings],
+                "references": research.references,
+                "limitations": (
+                    "Jarvis queried only approved authoritative sources and "
+                    "verified their availability over HTTPS. Source retrieval "
+                    "does not prove that the described environment is affected; "
+                    "confirm versions, exposure, and local evidence before acting."
+                    if verified
+                    else "Live authoritative research was attempted but no source "
+                    "could be verified. This assessment relies on the supplied "
+                    "context and must be independently validated."
+                ),
+                "metadata": EngineMetadata(
+                    engine=self.version,
+                    mode=(
+                        "Live verified research"
+                        if verified
+                        else "Research unavailable"
+                    ),
+                    workflow=[
+                        WorkflowStage(
+                            name="scope_validation",
+                            note=(
+                                "Validated required case context and input boundaries."
+                            ),
+                        ),
+                        WorkflowStage(
+                            name="risk_triage",
+                            note="Classified urgency using transparent defensive rules.",
+                        ),
+                        WorkflowStage(
+                            name="authoritative_research",
+                            status="completed" if verified else "partial",
+                            note=research.note,
+                        ),
+                        WorkflowStage(
+                            name="control_mapping",
+                            note=(
+                                "Combined retrieved evidence with scenario-specific "
+                                "defensive controls."
+                            ),
+                        ),
+                        WorkflowStage(
+                            name="report_drafting",
+                            note=(
+                                "Prepared cited findings for human review and PDF export."
+                            ),
+                        ),
+                    ],
+                ),
+            }
+        )
+
+    @staticmethod
+    def _risk_max(
+        baseline: RiskLevel,
+        research_floor: RiskLevel | None,
+    ) -> RiskLevel:
+        if research_floor is None:
+            return baseline
+        order = {
+            RiskLevel.LOW: 0,
+            RiskLevel.MODERATE: 1,
+            RiskLevel.HIGH: 2,
+            RiskLevel.CRITICAL: 3,
+        }
+        return (
+            research_floor
+            if order[research_floor] > order[baseline]
+            else baseline
+        )

@@ -78,6 +78,7 @@ import com.ledang99.jarvis.domain.AssessmentReport
 import com.ledang99.jarvis.domain.CaseInput
 import com.ledang99.jarvis.domain.CaseType
 import com.ledang99.jarvis.domain.Finding
+import com.ledang99.jarvis.domain.Reference
 import com.ledang99.jarvis.domain.Remediation
 import com.ledang99.jarvis.domain.RiskLevel
 import com.ledang99.jarvis.report.PdfReportExporter
@@ -91,6 +92,8 @@ import com.ledang99.jarvis.ui.theme.Red400
 import com.ledang99.jarvis.ui.theme.Slate300
 import com.ledang99.jarvis.ui.theme.Slate400
 import com.ledang99.jarvis.ui.theme.Teal300
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -254,7 +257,7 @@ private fun HomeScreen(onStart: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 AssistChip(
                     onClick = {},
-                    label = { Text("BACKEND + OFFLINE FALLBACK") },
+                    label = { Text("LIVE SOURCES + OFFLINE FALLBACK") },
                     leadingIcon = {
                         Icon(
                             Icons.Rounded.Science,
@@ -457,7 +460,7 @@ private fun NewCaseScreen(
                             tint = Blue400,
                         )
                         Text(
-                            "Jarvis sends the case to the backend assessment workflow. If it cannot connect, the transparent local engine keeps the assessment available offline.",
+                            "Jarvis asks the backend to check approved authoritative sources over HTTPS. If it cannot connect, the transparent local engine remains available offline.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = Slate300,
                         )
@@ -573,29 +576,15 @@ private fun ReportScreen(
 
             item {
                 ReportSection(
-                    eyebrow = "REFERENCE STARTING POINTS",
-                    title = "Verify before acting",
+                    eyebrow = "EXTERNAL SOURCES",
+                    title = "Retrieved and checked",
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         report.references.forEach { reference ->
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .clickable { uriHandler.openUri(reference.url) }
-                                    .background(Navy800)
-                                    .padding(14.dp),
-                            ) {
-                                Text(
-                                    reference.publisher,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = Teal300,
-                                )
-                                Text(
-                                    reference.title,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
-                            }
+                            ReferenceRow(
+                                reference = reference,
+                                onClick = { uriHandler.openUri(reference.url) },
+                            )
                         }
                     }
                 }
@@ -770,6 +759,97 @@ private fun FindingRow(finding: Finding) {
                 color = Slate400,
             )
         }
+    }
+}
+
+@Composable
+private fun ReferenceRow(reference: Reference, onClick: () -> Unit) {
+    val verified = reference.verificationStatus == "verified"
+    val unavailable = reference.verificationStatus == "unavailable"
+    val statusColor = when {
+        verified -> Teal300
+        unavailable -> Amber400
+        else -> Slate400
+    }
+    val statusLabel = when {
+        verified -> "VERIFIED"
+        unavailable -> "UNAVAILABLE"
+        else -> "NOT CHECKED"
+    }
+    val retrieved = remember(reference.retrievedAt) {
+        reference.retrievedAt?.let {
+            DateTimeFormatter.ofPattern("dd MMM, HH:mm z")
+                .withZone(ZoneId.systemDefault())
+                .format(it)
+        } ?: "Not retrieved"
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .background(Navy800)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                reference.publisher,
+                style = MaterialTheme.typography.labelLarge,
+                color = Teal300,
+                modifier = Modifier.weight(1f),
+            )
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(statusColor.copy(alpha = 0.12f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Icon(
+                    when {
+                        verified -> Icons.Rounded.CheckCircle
+                        unavailable -> Icons.Rounded.WarningAmber
+                        else -> Icons.Rounded.Science
+                    },
+                    contentDescription = null,
+                    tint = statusColor,
+                    modifier = Modifier.size(14.dp),
+                )
+                Text(
+                    statusLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = statusColor,
+                    fontSize = 10.sp,
+                )
+            }
+        }
+        Text(reference.title, style = MaterialTheme.typography.titleMedium)
+        if (reference.evidence.isNotBlank()) {
+            Text(
+                reference.evidence,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Slate300,
+            )
+        }
+        Text(
+            "Retrieved: $retrieved",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Slate400,
+        )
+        Text(
+            reference.url,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Blue400,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
